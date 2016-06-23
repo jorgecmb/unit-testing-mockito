@@ -9,6 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.any;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -160,4 +162,77 @@ public class EncerradorDeLeilaoTest {
         // a segunra invocação
         inOrder.verify(enviadorFalso, times(1)).envia(leilao1);
 	}
+	
+	@Test
+	public void deveContinuarAExecucaoMesmoQuandoDaoFalha() {
+        Calendar antiga = Calendar.getInstance();
+        antiga.set(1999, 1, 20);
+
+        Leilao leilao1 = new CriadorDeLeilao().para("TV de plasma")
+            .naData(antiga).constroi();
+        Leilao leilao2 = new CriadorDeLeilao().para("Geladeira")
+            .naData(antiga).constroi();
+
+        RepositorioDeLeiloes daoFalso = mock(RepositorioDeLeiloes.class);
+        when(daoFalso.correntes()).thenReturn(Arrays.asList(leilao1, leilao2));
+
+        doThrow(new RuntimeException()).when(daoFalso).atualiza(leilao1);
+
+        EnviadorDeEmail carteiroFalso = mock(EnviadorDeEmail.class);
+        EncerradorDeLeilao encerrador =  new EncerradorDeLeilao(daoFalso, carteiroFalso);
+
+        encerrador.encerra();
+
+        verify(daoFalso).atualiza(leilao2);
+        verify(carteiroFalso).envia(leilao2);
+    }
+	
+	@Test
+	public void deveContinuarAExecucaoMesmoQuandoEmailFalha() {
+        Calendar antiga = Calendar.getInstance();
+        antiga.set(1999, 1, 20);
+
+        Leilao leilao1 = new CriadorDeLeilao().para("TV de plasma")
+            .naData(antiga).constroi();
+        Leilao leilao2 = new CriadorDeLeilao().para("Geladeira")
+            .naData(antiga).constroi();
+
+        RepositorioDeLeiloes daoFalso = mock(RepositorioDeLeiloes.class);
+        EnviadorDeEmail carteiroFalso = mock(EnviadorDeEmail.class);
+        
+        when(daoFalso.correntes()).thenReturn(Arrays.asList(leilao1, leilao2));
+
+        doThrow(new RuntimeException()).when(carteiroFalso).envia(leilao1);
+
+        EncerradorDeLeilao encerrador = new EncerradorDeLeilao(daoFalso, carteiroFalso);
+
+        encerrador.encerra();
+
+        verify(daoFalso).atualiza(leilao2);
+        verify(carteiroFalso).envia(leilao2);
+    }
+	
+	@Test
+	public void deveContinuarAExecucaoMesmoQuandoTodosOsEmailsFalham() {
+        Calendar antiga = Calendar.getInstance();
+        antiga.set(1999, 1, 20);
+
+        Leilao leilao1 = new CriadorDeLeilao().para("TV de plasma")
+            .naData(antiga).constroi();
+        Leilao leilao2 = new CriadorDeLeilao().para("Geladeira")
+            .naData(antiga).constroi();
+
+        RepositorioDeLeiloes daoFalso = mock(RepositorioDeLeiloes.class);
+        EnviadorDeEmail carteiroFalso = mock(EnviadorDeEmail.class);
+        
+        when(daoFalso.correntes()).thenReturn(Arrays.asList(leilao1, leilao2));
+
+        doThrow(new RuntimeException()).when(daoFalso).atualiza(any(Leilao.class));
+
+        EncerradorDeLeilao encerrador = new EncerradorDeLeilao(daoFalso, carteiroFalso);
+
+        encerrador.encerra();
+
+        verify(carteiroFalso, never()).envia(any(Leilao.class));
+    }
 }
